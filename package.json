@@ -1,0 +1,15 @@
+{
+  "name": "github-releases-renderer",
+  "version": "0.0.1",
+  "description": "Render github releases on template.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "aioutecism",
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^2.9.0",
+    "request": "^2.75.0"
+  }
+}
