@@ -5,6 +5,7 @@ const program = require('commander');
 program
     .command('run <author> <repo> <in-file> <out-file>')
     .option('-c --count <count>', 'Count of releases to render.')
+    .option('-t --token <token>', 'Personal Access Token for API request.')
     .action((author, repo, inFile, outFile, options) => {
         getReleases(author, repo, options, (error, releases) => {
             if (error) {
@@ -18,13 +19,17 @@ program
 
 const templateRegexp = /```releases\r?\n([\s\S]*)```/g;
 
-const getHeaders = () => {
+const getHeaders = (options) => {
     const headers = {
         'User-Agent': 'github-releases-renderer',
     };
 
     if (process.env['GITHUB_RELEASE_RENDERER_TOKEN']) {
         headers['Authorization'] = `Token ${process.env['GITHUB_RELEASE_RENDERER_TOKEN']}`;
+    }
+
+    if (options.token) {
+        headers['Authorization'] = `Token ${options.token}`;
     }
 
     return headers;
@@ -41,10 +46,10 @@ const getOptions = (options) => {
 };
 
 const getReleases = (author, repo, options, callback) => {
-    const urlBase = `https://api.github.com/repos/${author}/${repo}/releases`;
-    const headers = getHeaders();
-
     options = getOptions(options);
+
+    const urlBase = `https://api.github.com/repos/${author}/${repo}/releases`;
+    const headers = getHeaders(options);
 
     once = (result, page, total) => {
         request({
