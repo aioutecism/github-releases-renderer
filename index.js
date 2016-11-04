@@ -6,44 +6,79 @@ program
     .command('run <author> <repo> <in-file> <out-file>')
     .option('-c --count <count>', 'Count of releases to render.')
     .action((author, repo, inFile, outFile, options) => {
-        getReleases(author, repo, (error, releases) => {
+        getReleases(author, repo, options, (error, releases) => {
             if (error) {
                 console.error(error);
                 return;
             }
 
-            save(releases, inFile, outFile, options.count);
+            save(releases, inFile, outFile);
         });
     });
 
 const templateRegexp = /```releases\r?\n([\s\S]*)```/g;
 
-const getReleases = (author, repo, callback) => {
-    request({
-        url: `https://api.github.com/repos/${author}/${repo}/releases`,
-        headers: {
-            'User-Agent': 'github-releases-renderer',
-        },
-    }, ((error, response, body) => {
-        if (error) {
-            callback(error);
-            return;
-        }
+const getHeaders = () => {
+    const headers = {
+        'User-Agent': 'github-releases-renderer',
+    };
 
-        if (response.statusCode !== 200) {
-            callback(new Error(`Request failed with status code: ${response.statusCode}`));
-            return;
-        }
-
-        callback(null, JSON.parse(body));
-    }));
-};
-
-const save = (releases, inFile, outFile, count) => {
-    if (count !== undefined) {
-        releases = releases.splice(0, count);
+    if (process.env['GITHUB_RELEASE_RENDERER_TOKEN']) {
+        headers['Authorization'] = `Token ${process.env['GITHUB_RELEASE_RENDERER_TOKEN']}`;
     }
 
+    return headers;
+};
+
+const getOptions = (options) => {
+    const result = Object.assign({}, {
+        count: 10,
+    }, options);
+
+    result.count = parseInt(result.count, 10);
+
+    return result;
+};
+
+const getReleases = (author, repo, options, callback) => {
+    const urlBase = `https://api.github.com/repos/${author}/${repo}/releases`;
+    const headers = getHeaders();
+
+    options = getOptions(options);
+
+    once = (result, page, total) => {
+        request({
+            url: urlBase + `?page=${page}`,
+            headers
+        }, ((error, response, body) => {
+            if (error) {
+                callback(error);
+                return;
+            }
+
+            if (response.statusCode !== 200) {
+                callback(new Error(`Request failed with status code: ${response.statusCode}`));
+                return;
+            }
+
+            const releases = JSON.parse(body);
+            result.push.apply(result, releases);
+
+            total += releases.length;
+
+            if (releases.length === 0 || (options.count !== 0 && total >= options.count)) {
+                callback(null, result);
+                return;
+            }
+
+            once(result, page + 1, total);
+        }));
+    };
+
+    once([], 1, 0);
+};
+
+const save = (releases, inFile, outFile) => {
     const sourceContent = fs.readFileSync(inFile, 'utf8');
 
     const renderedContent = sourceContent.replace(templateRegexp, (match) => {
