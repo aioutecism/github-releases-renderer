@@ -72,6 +72,7 @@ const getReleases = (author, repo, options, callback) => {
             total += releases.length;
 
             if (releases.length === 0 || (options.count !== 0 && total >= options.count)) {
+                result.splice(options.count);
                 callback(null, result);
                 return;
             }
